@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>GGAC 마니또 관리자 페이지</title>
+
+<!-- Firebase v8 (안정된 방식) -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+<style>
+    body {
+        font-family: Pretendard, sans-serif;
+        background: #eef1f6;
+        padding: 36px;
+    }
+
+    #wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 28px;
+        background: white;
+        border-radius: 14px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    h1 { text-align:center; font-size:26px; margin-bottom:18px; }
+    h3 { margin-top:20px; font-size:16px; font-weight:600; }
+
+    textarea, input {
+        width:100%;
+        padding:12px;
+        border-radius:10px;
+        border:1px solid #d6d9de;
+        background:#fafafa;
+        box-sizing:border-box;
+        font-size:14px;
+    }
+
+    .btn {
+        width:100%;
+        padding:12px;
+        margin-top:12px;
+        background:#4F6BFF;
+        color:white;
+        border:none;
+        border-radius:10px;
+        font-weight:600;
+        cursor:pointer;
+    }
+    .btn:hover { opacity:0.95; }
+
+    .btn-red { background:#FF4F4F; }
+    .row { display:flex; gap:16px; }
+    .col { flex:1; }
+
+    .box {
+        margin-top:18px;
+        padding:16px;
+        background:#f7f8fb;
+        border-radius:12px;
+        border:1px solid #e7e9ee;
+    }
+
+    .user-item {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        padding:8px 6px;
+        border-bottom:1px solid #eee;
+        font-size:14px;
+    }
+    .user-item:last-child { border-bottom: none; }
+
+    .user-item button {
+        padding:6px 10px;
+        border-radius:8px;
+        border:none;
+        background:#4F6BFF;
+        color:white;
+        cursor:pointer;
+        font-size:13px;
+    }
+
+    /* 메시지 카드 */
+    .msg-card {
+        background:#fff;
+        border-radius:12px;
+        padding:12px;
+        border:1px solid #e6e9ee;
+        box-shadow: 0 2px 8px rgba(16,24,40,0.03);
+        margin-bottom:10px;
+    }
+    .msg-meta { font-size:13px; color:#6b7280; margin-bottom:6px; }
+    .msg-text { font-size:14px; white-space:pre-line; color:#111827; }
+
+    .small { font-size:12px; color:#808089; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+    <h1>GGAC 마니또 관리자</h1>
+
+    <div class="box">
+        <h3>참여자 대량 등록</h3>
+        <textarea id="names" placeholder="이름을 줄바꿈으로 입력하세요. 예)&#10;김민수&#10;박서연"></textarea>
+        <button class="btn" onclick="registerParticipants()">참여자 등록</button>
+
+        <button class="btn btn-red" style="margin-top:10px;" onclick="deleteAllParticipants()">⚠ 참여자 전체 삭제</button>
+    </div>
+
+    <div class="row" style="margin-top:18px;">
+        <div class="col">
+            <div class="box">
+                <h3>현재 참여자 목록</h3>
+                <div id="list">불러오는 중...</div>
+            </div>
+
+            <button class="btn" style="margin-top:12px;" onclick="runMatching()">랜덤 매칭 실행</button>
+
+            <div class="box" style="margin-top:12px;">
+                <h3>매칭 결과</h3>
+                <div id="matchedList">없음</div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="box">
+                <h3>메시지함 (관리자용)</h3>
+                <div id="messageList" class="small">좌측에서 참여자를 선택하세요.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ---------- 미션 관리 영역 추가 ---------- -->
+    <div class="box" style="margin-top:22px;">
+        <h3>미션 대량 등록 (한 줄에 한 미션)</h3>
+        <textarea id="missionsInput" placeholder="예)&#10;칭찬 한마디 전하기&#10;편지 남기기"></textarea>
+        <button class="btn" style="margin-top:8px;" onclick="registerMissions()">미션 등록</button>
+        <button class="btn btn-red" style="margin-top:8px;" onclick="deleteAllMissions()">미션 전체 삭제</button>
+
+        <div style="margin-top:12px;">
+            <h4>등록된 미션</h4>
+            <div id="missionList">불러오는 중...</div>
+        </div>
+
+        <div style="margin-top:12px;">
+            <h4>미션 랜덤 배정</h4>
+            <button class="btn" onclick="runMissionMatching()">미션 배정 실행 (중복 허용)</button>
+            <div id="missionAssignResult" style="margin-top:8px;" class="small"></div>
+        </div>
+    </div>
+    <!-- ---------- /미션 관리 영역 ---------- -->
+
+</div>
+
+<script>
+/* ----------------------
+   Firebase(v8) 설정
+   ---------------------- */
+const firebaseConfig = {
+    apiKey: "AIzaSyCo0eEyu6iaqSxd0zCCYKgc9tjrLsJUIvo",
+    authDomain: "manitto3-e0164.firebaseapp.com",
+    projectId: "manitto3-e0164",
+    storageBucket: "manitto3-e0164.firebasestorage.app",
+    messagingSenderId: "97931219910",
+    appId: "1:97931219910:web:4ad27aae6fef4b6024d8c7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ----------------------
+   유틸: 랜덤 코드 (1000~9999의 4자리 숫자)
+   ---------------------- */
+function makeCode() {
+    return String(Math.floor(Math.random() * 9000) + 1000);
+}
+
+/* ======================
+   참여자 등록 (누락방지)
+   ====================== */
+async function registerParticipants() {
+    const raw = document.getElementById("names").value || "";
+    const names = raw.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+    if (!names.length) { alert("이름을 입력하세요."); return; }
+
+    function registerOne(name) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                let code = makeCode();
+                let snap = await db.collection("participants").doc(code).get();
+                while (snap.exists) {
+                    code = makeCode();
+                    snap = await db.collection("participants").doc(code).get();
+                }
+                await db.collection("participants").doc(code).set({
+                    name: name,
+                    matched_to: "",
+                    mission: "" // mission 필드 초기화
+                });
+                resolve({ code, name });
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    try {
+        const results = await Promise.all(names.map(n => registerOne(n)));
+        console.log("registered:", results);
+        alert(`등록 완료! (${results.length}명)`);
+        document.getElementById("names").value = "";
+        loadParticipants();
+    } catch (err) {
+        console.error("register error:", err);
+        alert("참여자 등록 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+    }
+}
+
+/* 전체 삭제 (주의: 소수 인원용) */
+async function deleteAllParticipants() {
+    if (!confirm("정말 모든 참가자를 삭제하시겠습니까?")) return;
+    try {
+        const snap = await db.collection("participants").get();
+        const batch = db.batch();
+        snap.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        alert("참여자 전체 삭제 완료");
+        loadParticipants();
+        document.getElementById("messageList").innerHTML = "좌측에서 참여자를 선택하세요.";
+    } catch (e) {
+        console.error(e);
+        alert("삭제 중 오류 발생");
+    }
+}
+
+/* 참여자 목록 불러오기 */
+async function loadParticipants() {
+    try {
+        const snap = await db.collection("participants").orderBy("name","asc").get();
+        if (!snap.empty) {
+            let html = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                html += `
+                    <div class="user-item">
+                        <div><strong>${d.name}</strong> <span class="small">(${doc.id})</span></div>
+                        <div><button onclick="loadMessages('${doc.id}')">메시지 보기</button></div>
+                    </div>`;
+            });
+            document.getElementById("list").innerHTML = html;
+        } else {
+            document.getElementById("list").innerHTML = "<div class='small'>참여자가 없습니다.</div>";
+        }
+    } catch (e) {
+        console.error("loadParticipants error:", e);
+        document.getElementById("list").innerHTML = "<div class='small'>불러오기 오류 (콘솔 확인)</div>";
+    }
+}
+loadParticipants();
+
+/* 랜덤 매칭 실행 */
+async function runMatching() {
+    try {
+        const snap = await db.collection("participants").get();
+        const arr = [];
+        snap.forEach(doc => arr.push({ code: doc.id, name: doc.data().name }));
+
+        if (arr.length < 2) {
+            alert("참여자가 2명 이상 있어야 매칭 가능합니다.");
+            return;
+        }
+
+        // 1. Fisher-Yates shuffle (안정적 셔플)
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+
+        // 2. 순환 매칭
+        const batch = db.batch();
+        for (let i = 0; i < arr.length; i++) {
+            const giver = arr[i];
+            const receiver = arr[(i + 1) % arr.length];
+
+            const ref = db.collection("participants").doc(giver.code);
+            batch.update(ref, {
+                matched_to: receiver.name,
+                matched_code: receiver.code
+            });
+        }
+
+        await batch.commit();
+
+        alert("랜덤 매칭 완료!");
+        loadMatched();
+    } catch (e) {
+        console.error("matching error:", e);
+        alert("매칭 중 오류 발생");
+    }
+}
+
+/* 매칭 결과 불러오기 */
+async function loadMatched() {
+    try {
+        const snap = await db.collection("participants").orderBy("name","asc").get();
+        if (!snap.empty) {
+            let html = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                html += `<div class="user-item">${d.name} → ${d.matched_to || "<span class='small'>미매칭</span>"}</div>`;
+            });
+            document.getElementById("matchedList").innerHTML = html;
+        } else {
+            document.getElementById("matchedList").innerHTML = "없음";
+        }
+    } catch (e) {
+        console.error("loadMatched err:", e);
+        document.getElementById("matchedList").innerHTML = "오류";
+    }
+}
+
+/* =========================
+   메시지함: code(문서ID) 기준 조회
+   ========================= */
+async function loadMessages(code) {
+    // 초기 UI
+    document.getElementById("messageList").innerHTML = `
+        <div style="margin-bottom:10px;"><strong>선택된 코드:</strong> ${code}</div>
+        <div style="display:flex; gap:12px;">
+            <div style="flex:1;">
+                <h4 style="margin:0 0 8px 0;">📥 받은 메시지</h4>
+                <div id="inbox">불러오는 중...</div>
+            </div>
+            <div style="flex:1;">
+                <h4 style="margin:0 0 8px 0;">📤 보낸 메시지</h4>
+                <div id="outbox">불러오는 중...</div>
+            </div>
+        </div>
+    `;
+
+    const msgsRef = db.collection("messages");
+
+    function renderCard(header, d) {
+        const timeStr = d.time ? (new Date(Number(d.time)).toLocaleString()) : "";
+        return `
+            <div class="msg-card">
+                <div class="msg-meta">${header} · <span class="small">${timeStr}</span></div>
+                <div class="msg-text">${(d.text||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+            </div>
+        `;
+    }
+
+    // 받은 메시지 (orderBy 시도 후 실패시 fallback)
+    try {
+        const recvSnap = await msgsRef.where("to", "==", code).orderBy("time","asc").get();
+        let recvHTML = "";
+        recvSnap.forEach(doc => recvHTML += renderCard("From: " + (doc.data().from || ""), doc.data()));
+        document.getElementById("inbox").innerHTML = recvHTML || "<div class='small'>받은 메시지가 없습니다.</div>";
+    } catch (err) {
+        console.warn("recv orderBy err (try fallback):", err);
+        try {
+            const recvSnap2 = await msgsRef.where("to","==",code).get();
+            let recvHTML = "";
+            recvSnap2.forEach(doc => recvHTML += renderCard("From: " + (doc.data().from||""), doc.data()));
+            document.getElementById("inbox").innerHTML = recvHTML || "<div class='small'>받은 메시지가 없습니다.</div>";
+        } catch (e2) {
+            console.error("recv fallback err:", e2);
+            document.getElementById("inbox").innerHTML = `<div class='small'>불러오기 오류</div>`;
+        }
+    }
+
+    // 보낸 메시지
+    try {
+        const sendSnap = await msgsRef.where("from","==",code).orderBy("time","asc").get();
+        let sendHTML = "";
+        sendSnap.forEach(doc => sendHTML += renderCard("To: " + (doc.data().to || ""), doc.data()));
+        document.getElementById("outbox").innerHTML = sendHTML || "<div class='small'>보낸 메시지가 없습니다.</div>";
+    } catch (err) {
+        console.warn("send orderBy err (try fallback):", err);
+        try {
+            const sendSnap2 = await msgsRef.where("from","==",code).get();
+            let sendHTML = "";
+            sendSnap2.forEach(doc => sendHTML += renderCard("To: " + (doc.data().to||""), doc.data()));
+            document.getElementById("outbox").innerHTML = sendHTML || "<div class='small'>보낸 메시지가 없습니다.</div>";
+        } catch (e2) {
+            console.error("send fallback err:", e2);
+            document.getElementById("outbox").innerHTML = `<div class='small'>불러오기 오류</div>`;
+        }
+    }
+
+    // 진단 로그 (개발 편의)
+    try {
+        const sample = await msgsRef.limit(5).get();
+        console.log("messages sample:", sample.docs.map(d=>d.data()));
+    } catch(e) { console.warn("sample read err", e); }
+}
+
+/* =========================
+   --------------
+   미션 관련 함수들
+   --------------
+   ========================= */
+
+/* 1) 대량 미션 등록: textarea 여러 줄을 한 번에 missions 컬렉션에 추가 */
+async function registerMissions() {
+    const raw = document.getElementById("missionsInput").value || "";
+    const lines = raw.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+
+    if (!lines.length) {
+        alert("미션을 입력하세요.");
+        return;
+    }
+
+    const batch = db.batch();
+    const ref = db.collection("missions");
+    lines.forEach(text => {
+        const docRef = ref.doc();
+        batch.set(docRef, { text });
+    });
+
+    try {
+        await batch.commit();
+        alert("미션 등록 완료!");
+        document.getElementById("missionsInput").value = "";
+        loadMissions();
+    } catch (e) {
+        console.error("registerMissions err", e);
+        alert("미션 등록 중 오류가 발생했습니다.");
+    }
+}
+
+/* 2) 미션 전체 삭제 */
+async function deleteAllMissions() {
+    if (!confirm("정말 모든 미션을 삭제하시겠습니까?")) return;
+
+    try {
+        const snap = await db.collection("missions").get();
+        const batch = db.batch();
+        snap.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        alert("미션 전체 삭제 완료");
+        loadMissions();
+    } catch (e) {
+        console.error("deleteAllMissions err", e);
+        alert("미션 삭제 중 오류");
+    }
+}
+
+/* 3) 미션 목록 불러오기 (운영자용 표시) */
+async function loadMissions() {
+    try {
+        const snap = await db.collection("missions").get();
+        if (snap.empty) {
+            document.getElementById("missionList").innerHTML = "<div class='small'>등록된 미션이 없습니다.</div>";
+            return;
+        }
+
+        let html = "";
+        snap.forEach(doc => {
+            html += `<div class="user-item">${(doc.data().text||"").replace(/</g,"&lt;")}</div>`;
+        });
+
+        document.getElementById("missionList").innerHTML = html;
+    } catch (e) {
+        console.error("loadMissions err", e);
+        document.getElementById("missionList").innerHTML = "<div class='small'>불러오기 오류</div>";
+    }
+}
+loadMissions();
+
+/* 4) 랜덤 미션 배정 (중복 허용)
+   - participants를 섞고 missions를 배열로 가져와서
+   - participants[i] -> missions[i % missions.length]
+*/
+async function runMissionMatching() {
+    try {
+        const userSnap = await db.collection("participants").get();
+        const missionSnap = await db.collection("missions").get();
+
+        if (userSnap.empty) {
+            alert("참여자가 없습니다.");
+            return;
+        }
+        if (missionSnap.empty) {
+            alert("등록된 미션이 없습니다.");
+            return;
+        }
+
+        // participants 배열
+        const users = [];
+        userSnap.forEach(doc => users.push({ code: doc.id, name: doc.data().name }));
+
+        // missions 배열 (text)
+        const missions = [];
+        missionSnap.forEach(doc => missions.push(doc.data().text));
+
+        // shuffle users (Fisher-Yates)
+        for (let i = users.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [users[i], users[j]] = [users[j], users[i]];
+        }
+
+        // shuffle missions (so assignment is random; duplicates allowed by modulo)
+        for (let i = missions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [missions[i], missions[j]] = [missions[j], missions[i]];
+        }
+
+        // batch update participants' mission field
+        const batch = db.batch();
+        for (let i = 0; i < users.length; i++) {
+            const u = users[i];
+            const m = missions[i % missions.length];
+            const ref = db.collection("participants").doc(u.code);
+            batch.update(ref, { mission: m });
+        }
+
+        await batch.commit();
+
+        document.getElementById("missionAssignResult").innerText = "미션 배정 완료!";
+    } catch (e) {
+        console.error("runMissionMatching err", e);
+        alert("미션 배정 중 오류가 발생했습니다.");
+    }
+}
+
+</script>
+
+</body>
+</html>
