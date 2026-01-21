@@ -4,13 +4,13 @@
 
 // 여기에 Firebase 콘솔에서 복사한 config 붙여넣기
 const firebaseConfig = {
-  apiKey: "AIzaSyBJo-W_5pWHSCPn6ina69HBnGe6I7AOc6I",
-  authDomain: "manitto2-2f483.firebaseapp.com",
-  databaseURL: "https://manitto2-2f483-default-rtdb.firebaseio.com",
-  projectId: "manitto2-2f483",
-  storageBucket: "manitto2-2f483.firebasestorage.app",
-  messagingSenderId: "643868700290",
-  appId: "1:643868700290:web:267fa3533d5777c4f48e9b"
+  apiKey: "AIzaSyCLEdMyjGc-fdzE7cIAruC48Wb03RUFR_0",
+  authDomain: "naeilmanitto.firebaseapp.com",
+  databaseURL: "https://naeilmanitto-default-rtdb.firebaseio.com",
+  projectId: "naeilmanitto",
+  storageBucket: "naeilmanitto.firebasestorage.app",
+  messagingSenderId: "233342049227",
+  appId: "1:233342049227:web:369c25ab336b2dbe02b44e"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -218,3 +218,4 @@ function showMission() {
         document.getElementById("missionContent").innerText = myMission;
     }
 }
+
