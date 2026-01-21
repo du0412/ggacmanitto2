@@ -92,16 +92,15 @@ function showMatch() {
 async function showMessages() {
     const box = document.getElementById("messages-section");
 
-    // 토글
+    // 토글: 열려 있으면 닫기
     if (box.style.display === "block") {
         box.style.display = "none";
         return;
     }
 
-    // 닫기
+    // 다른 박스 닫기
     document.getElementById("match-section").style.display = "none";
     document.getElementById("send-section").style.display = "none";
-    document.getElementById("mission-section").style.display = "none";
 
     box.style.display = "block";
     box.innerHTML = "<b>메시지 불러오는 중...</b>";
@@ -112,18 +111,41 @@ async function showMessages() {
     const r1 = await q1.get();
     const r2 = await q2.get();
 
-    let html = "<h3>받은 메시지</h3>";
-    r1.forEach(doc => {
-        html += `<div> - ${doc.data().text}</div>`;
-    });
+    let html = `
+        <div class="message-title">받은 메시지</div>
+    `;
+    
+    if (r1.empty) {
+        html += `<div class="message-card">도착한 메시지가 없습니다.</div>`;
+    } else {
+        r1.forEach(doc => {
+            html += `
+                <div class="message-card">
+                    <div class="message-text">${doc.data().text}</div>
+                </div>
+            `;
+        });
+    }
 
-    html += "<h3>보낸 메시지</h3>";
-    r2.forEach(doc => {
-        html += `<div> - ${doc.data().text}</div>`;
-    });
+    html += `
+        <div class="message-title">보낸 메시지</div>
+    `;
+
+    if (r2.empty) {
+        html += `<div class="message-card">보낸 메시지가 없습니다.</div>`;
+    } else {
+        r2.forEach(doc => {
+            html += `
+                <div class="message-card">
+                    <div class="message-text">${doc.data().text}</div>
+                </div>
+            `;
+        });
+    }
 
     box.innerHTML = html;
 }
+
 
 /* -------------------------
    6. 메시지 보내기
@@ -218,4 +240,5 @@ function showMission() {
         document.getElementById("missionContent").innerText = myMission;
     }
 }
+
 
